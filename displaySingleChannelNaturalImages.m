@@ -10,14 +10,22 @@
 % right now. But these may be useful in future when we have comparable EEG
 % data, and therefore have not been removed.
 
+% Options added to include a "prediction" variable. For this, we find a
+% "prediction" signal based on the image properties inside vs outside of a
+% given radius. Different methods for computing this prediction value will
+% be added in future iterations.
+
 % Run this function as:
 % displaySingleChannelNaturalImages('alpaH','240817','GRF_002')
+
+% To get the results in Kanth and Ray, 2024, eNeuro, choose
+% radiusMatrixDeg=0:3:0.3:2 and set prediction variable to 'None'
 
 function displaySingleChannelNaturalImages(subjectName,expDate,protocolName,powerOption,selectOptions,radiusMatrixDeg,folderSourceString,gridType,gridLayout,badTrialNameStr,useCommonBadTrialsFlag)
 
 if ~exist('powerOption','var');         powerOption=3;                  end
 if ~exist('selectOptions','var');       selectOptions=[];               end
-if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
+if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=1;              end
 if ~exist('folderSourceString','var');  folderSourceString='';          end
 if ~exist('gridType','var');            gridType='Microelectrode';      end
 if ~exist('gridLayout','var');          gridLayout=2;                   end
@@ -122,7 +130,7 @@ xlabel(hRFMapPlot,'Degrees'); ylabel(hRFMapPlot,'Degrees');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Parameters panel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-parameterBoxHeight = 0.2; parameterBoxGap=0; parameterTextWidth = 0.6;
+parameterBoxHeight = 0.125; parameterBoxGap=0; parameterTextWidth = 0.6;
 hParameterPanel = uipanel('Title','Parameters','fontSize', fontSizeLarge, ...
     'Unit','Normalized','Position',[parametersStartPos allPanelsStartHeight parametersPanelWidth allPanelsHeight]);
 
@@ -130,38 +138,38 @@ hParameterPanel = uipanel('Title','Parameters','fontSize', fontSizeLarge, ...
 [analogChannelStringList,analogChannelStringArray] = getAnalogStringFromValues(analogChannels,analogInputNums);
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight],...
-    'Style','text','String','Analog Channel','FontSize',fontSizeMedium);
+    'Style','text','String','Analog Channel','FontSize',fontSizeSmall);
 hAnalogChannel = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'BackgroundColor', backgroundColor, 'Position', ...
     [parameterTextWidth 1-(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-    'Style','popup','String',analogChannelStringList,'FontSize',fontSizeMedium);
+    'Style','popup','String',analogChannelStringList,'FontSize',fontSizeSmall);
 
 % Spike channel
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-2*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight],...
-    'Style','text','String','Spike Channel','FontSize',fontSizeMedium);
+    'Style','text','String','Spike Channel','FontSize',fontSizeSmall);
     
 if ~isempty(spikeChannels)
     spikeChannelString = getNeuralStringFromValues(spikeChannels,sourceUnitIDs);
     hSpikeChannel = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
         'BackgroundColor', backgroundColor, 'Position', ...
         [parameterTextWidth 1-2*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-        'Style','popup','String',spikeChannelString,'FontSize',fontSizeMedium);
+        'Style','popup','String',spikeChannelString,'FontSize',fontSizeSmall);
 else
     hSpikeChannel = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
         'Position', [parameterTextWidth 1-2*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-        'Style','text','String','Not found','FontSize',fontSizeMedium);
+        'Style','text','String','Not found','FontSize',fontSizeSmall);
 end
 
 % Analysis Type
 analysisTypeString = 'ERP|Firing Rate|Raster|FFT|delta FFT|FFT_ERP|delta FFT_ERP|TF|delta TF';
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-3*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
-    'Style','text','String','Analysis Type','FontSize',fontSizeMedium);
+    'Style','text','String','Analysis Type','FontSize',fontSizeSmall);
 hAnalysisType = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'BackgroundColor', backgroundColor, 'Position', ...
     [parameterTextWidth 1-3*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-    'Style','popup','String',analysisTypeString,'FontSize',fontSizeMedium);
+    'Style','popup','String',analysisTypeString,'FontSize',fontSizeSmall);
 
 % Set Number
 if ~isempty(set2Name)
@@ -173,11 +181,11 @@ else
 end
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-4*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
-    'Style','text','String','Set Name','FontSize',fontSizeMedium);
+    'Style','text','String','Set Name','FontSize',fontSizeSmall);
 hSetNum = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'BackgroundColor', backgroundColor, 'Position',...
     [parameterTextWidth 1-4*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-    'Style','popup','String',setNums,'FontSize',fontSizeMedium);
+    'Style','popup','String',setNums,'FontSize',fontSizeSmall);
 
 % Reference scheme
 referenceChannelStringList = ['None|AvgRef|' analogChannelStringList];
@@ -185,11 +193,31 @@ referenceChannelStringArray = [{'None'} {'AvgRef'} analogChannelStringArray];
 
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-5*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
-    'Style','text','String','Reference','FontSize',fontSizeMedium);
+    'Style','text','String','Reference','FontSize',fontSizeSmall);
 hReferenceChannel = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'BackgroundColor', backgroundColor, 'Position',...
     [parameterTextWidth 1-5*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-    'Style','popup','String',referenceChannelStringList,'FontSize',fontSizeMedium);
+    'Style','popup','String',referenceChannelStringList,'FontSize',fontSizeSmall);
+
+% Prediction
+predictionStringList = [{'None'} {'mismatchL2'} {'Compressibility'}];
+
+uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
+    'Position',[0 1-7*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
+    'Style','text','String','PredictionType','FontSize',fontSizeSmall);
+hPredictionType = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
+    'BackgroundColor', backgroundColor, 'Position',...
+    [parameterTextWidth 1-7*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
+    'Style','popup','String',predictionStringList,'FontSize',fontSizeSmall);
+
+% Option to change radius
+uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
+    'Position',[0 1-8*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
+    'Style','text','String','RadiusDeg','FontSize',fontSizeSmall);
+hRadius = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
+    'BackgroundColor', backgroundColor, 'Position',...
+    [parameterTextWidth 1-8*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
+    'Style','edit','String',num2str(radiusMatrixDeg),'FontSize',fontSizeSmall);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Timing panel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -357,11 +385,10 @@ elseif powerOption==3
     powerST = powerST - powerST2; % Difference in the ratios
 end
 
-
-
-hPowerPredictionPlot = subplot('Position',[0.825 0.45 0.15 0.25]);
-hCorrelationPlotFull = subplot('Position',[0.825 0.225 0.15 0.125]);
-hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.125]);
+hPowerPredictionPlot = subplot('Position',[0.825 0.525 0.15 0.175]);
+hPowerPredictionPlot2 = subplot('Position',[0.825 0.325 0.15 0.175]);
+hCorrelationPlotFull = subplot('Position',[0.825 0.16 0.15 0.1]);
+hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.1]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -774,7 +801,7 @@ zMax = -inf;
 for row=1:numRows
     for column=1:numCols
         % get positions
-        tmpAxisVals = caxis(plotHandles(row,column));
+        tmpAxisVals = clim(plotHandles(row,column));
         if tmpAxisVals(1) < zMin
             zMin = tmpAxisVals(1);
         end
@@ -816,7 +843,7 @@ function rescaleZPlots(plotHandles,zLims)
 
 for i=1:numRow
     for j=1:numCol
-        caxis(plotHandles(i,j),zLims);
+        clim(plotHandles(i,j),zLims);
     end
 end
 end
