@@ -105,7 +105,7 @@ if ~isempty(predictionVals)
     % Correlation after combining the predicted power from HSVR and
     % predictionVals
     predictionString{8} = 'HSVR+P';
-    predictedPower2 = predictedPower; % Update after doing cross-validated regression
+    predictedPower2 = combinePredictability(allPower,predictedPower,predictionVals);
 
     [correlationValsFull(8),correlationValsSelected(8)] = getCorrelations2(allPower,predictedPower2,selectedImageIndices);
 end
@@ -129,5 +129,43 @@ if length(selectedImageIndices)>2 % Need to have at least 3 data points. Otherwi
     rSelected = tmp(1,2);
 else
     rSelected = 0;
+end
+end
+function Y = combinePredictability(allPower,predictedPower,predictionVals)
+
+numFolds = 1; % - 1: No cross-validation, length(allPower) - Leave one out
+numSamples = length(allPower(:));
+
+trainingSet = cell(1,numFolds);
+testingSet = cell(1,numFolds);
+
+if numFolds==1
+    trainingSet{1} = 1:numSamples;
+    testingSet{1} = 1:numSamples;
+
+elseif numFolds==numSamples
+    for i=1:numFolds
+        trainingSet{i} = setdiff(1:numSamples,i);
+        testingSet{i} = i;
+    end
+else
+    cvp = cvpartition(zeros(1,numSamples),'KFold',numFolds);
+    for i=1:numFolds
+        trainingSet{i} = find(cvp.training(i));
+        testingSet{i} = find(cvp.test(i));
+    end
+end
+
+allPower = allPower(:);
+predictedPower = predictedPower(:);
+predictionVals = predictionVals(:);
+Y = zeros(numSamples,1);
+for i=1:numFolds
+    trainPredictedPower = predictedPower(trainingSet{i});
+    trainPredictionVals = predictionVals(trainingSet{i});
+    trainPower = allPower(trainingSet{i});
+
+    b = regress(trainPower(:),[ones(length(trainPower),1) trainPredictedPower(:) trainPredictionVals(:)]);
+    Y(testingSet{i}) = b(1)+ b(2)*predictedPower(testingSet{i}) + b(3)*predictionVals(testingSet{i});
 end
 end
