@@ -17,10 +17,11 @@
 % 2. selected images for which predition is deemed non-trivial (r>rCutoff)
 % (correlationValsSelected)
 
-function [correlationValsFull,correlationValsSelected,predictionString,predictedPower,selectedImageIndices,predictedPower2] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff,predictionVals)
+function [correlationValsFull,correlationValsSelected,predictionString,predictedPower,selectedImageIndices,predictedPower2,mCorr1,mCorr2] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff,predictionVals,getMeanPredictionsAcrossFoldsFlag)
 
 if ~exist('rCutoff','var');         rCutoff = 0.3;                      end
 if ~exist('predictionVals','var');  predictionVals = [];                end
+if ~exist('getMeanPredictionsAcrossFoldsFlag','var'); getMeanPredictionsAcrossFoldsFlag = 1;    end
 
 rMax = 10; % Large radius for which the gamma vs radius function saturates
 
@@ -105,9 +106,13 @@ if ~isempty(predictionVals)
     % Correlation after combining the predicted power from HSVR and
     % predictionVals
     predictionString{8} = 'HSVR+P';
-    predictedPower2 = combinePredictability(allPower,predictedPower,predictionVals);
-
+    [predictedPower2,mCorrs] = combinePredictability(allPower,predictedPower,predictionVals);
     [correlationValsFull(8),correlationValsSelected(8)] = getCorrelations2(allPower,predictedPower2,selectedImageIndices);
+    
+    if getMeanPredictionsAcrossFoldsFlag
+        correlationValsFull(6) = mCorrs(1);
+        correlationValsFull(8) = mCorrs(2);
+    end
 end
 end
 
@@ -131,9 +136,10 @@ else
     rSelected = 0;
 end
 end
-function Y = combinePredictability(allPower,predictedPower,predictionVals)
 
-numFolds = 1; % - 1: No cross-validation, length(allPower) - Leave one out
+function [Y,mCorrs] = combinePredictability(allPower,predictedPower,predictionVals)
+
+numFolds = 1; % - 1: No cross-validation, length(allPower): Leave one out
 numSamples = length(allPower(:));
 
 trainingSet = cell(1,numFolds);
@@ -159,13 +165,27 @@ end
 allPower = allPower(:);
 predictedPower = predictedPower(:);
 predictionVals = predictionVals(:);
+
 Y = zeros(numSamples,1);
+corr1 = zeros(1,numFolds);
+corr2 = zeros(1,numFolds);
+
 for i=1:numFolds
     trainPredictedPower = predictedPower(trainingSet{i});
     trainPredictionVals = predictionVals(trainingSet{i});
     trainPower = allPower(trainingSet{i});
 
     b = regress(trainPower(:),[ones(length(trainPower),1) trainPredictedPower(:) trainPredictionVals(:)]);
-    Y(testingSet{i}) = b(1)+ b(2)*predictedPower(testingSet{i}) + b(3)*predictionVals(testingSet{i});
+    testPredictionVals = b(1)+ b(2)*predictedPower(testingSet{i}) + b(3)*predictionVals(testingSet{i});
+
+    Y(testingSet{i}) = testPredictionVals;
+
+    % Also compute correlations for individual folds
+    tmp = corrcoef(allPower(testingSet{i}),predictedPower(testingSet{i}));
+    corr1(i) = tmp(1,2);
+
+    tmp = corrcoef(allPower(testingSet{i}),testPredictionVals);
+    corr2(i) = tmp(1,2);
 end
+mCorrs = [mean(corr1) mean(corr2)];
 end
