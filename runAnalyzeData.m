@@ -1,3 +1,4 @@
+predictionType = 'mismatchL2';
 powerOption = 3; % 1 - ST power, 2 - ST/BL ratio, 3 - ST/BL ratio minus ST/BL ratio in HG
 
 selectOptions.meanThr = [0.05 0.05 0.05];
@@ -5,7 +6,7 @@ selectOptions.stdThr = 2*selectOptions.meanThr;
 selectOptions.measure = 'diff';
 selectOptions.method = 'vector';
 
-radiusMatrixDeg = 0.3:0.3:2;
+radiusMatrixDeg = 1; %0.3:0.3:2;
 
 [experimentalDetails,matchIndex] = getExperimentalDetails;
 posList = 5; % Index for which data needs to be saved
@@ -33,7 +34,7 @@ for i=1:length(posList)
         
         if ~isempty(dataType)
             disp(['Working on ' subjectName expDate protocolName ', set: ' dataType]);
-            [cFull,cSelected,numSI,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,powerOption,selectOptions,radiusMatrixDeg);
+            [cFull,cSelected,numSI,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,powerOption,selectOptions,radiusMatrixDeg,'',predictionType);
             correlationsFull = cat(2,correlationsFull,cFull);
             correlationsSelected = cat(2,correlationsSelected,cSelected);
             numSelectedImages = cat(2,numSelectedImages,numSI);

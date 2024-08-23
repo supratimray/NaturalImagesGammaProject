@@ -1,8 +1,10 @@
-function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,powerOption,selectOptions,radiusMatrixDeg,folderSourceString)
+function [correlationsFull,correlationsSelected,numSelectedImages,predictionString] = analyzeData(subjectName,expDate,protocolName,imageFolderName,imageIndices,powerOption,selectOptions,radiusMatrixDeg,folderSourceString,predictionType)
 
 if ~exist('powerOption','var');         powerOption=3;                  end
 if ~exist('radiusMatrixDeg','var');     radiusMatrixDeg=[];             end
+if ~exist('predictionType','var');      predictionType='None';          end
 
+rCutoff = 0.3;
 patchSizeDeg = 2;
 if isempty(radiusMatrixDeg)
     radiusMatrixDeg = 0.3:0.3:patchSizeDeg;
@@ -37,10 +39,13 @@ disp('Getting stim params...');
 numElectrodes = size(powerST,1);
 numImages = size(powerST,2);
 allStimParams = cell(numElectrodes,numImages);
+allPatchData = cell(numElectrodes,numImages);
+
 for i=1:numImages
     % Load image
     imageFileName = fullfile(rawImageFolder,['Image' num2str(imageIndices(i)) '.png']);
     [patchData,imageAxesDeg] = getImagePatches(imageFileName,electrodeList,subjectName,folderSourceString,patchSizeDeg,plottingDetails);
+    allPatchData(:,i) = patchData;
     
     % Get Stim Parameters
     for j=1:numElectrodes
@@ -49,14 +54,22 @@ for i=1:numImages
     end
 end
 
-% 3. Get predicted gamma power and correlations
-correlationsFull = zeros(6,numElectrodes);
-correlationsSelected = zeros(6,numElectrodes);
+% 3. Get prediction values from image patches
+predictionVals = zeros(numElectrodes,numImages);
+for i=1:numElectrodes
+    stimParams = allStimParams(i,:);
+    patchData = allPatchData(i,:);
+    predictionVals(i,:) = getPredictionValues(stimParams,patchData,imageAxesDeg,predictionType);
+end
+
+% 4. Get predicted gamma power and correlations
+correlationsFull = zeros(8,numElectrodes);
+correlationsSelected = zeros(8,numElectrodes);
 numSelectedImages = zeros(1,numElectrodes);
 for i=1:numElectrodes
     actualPower = powerST(i,:);
     stimParams = allStimParams(i,:);
-    [correlationsFull(:,i),correlationsSelected(:,i),predictionString,~,selectedImageIndices] = getAllCorrelations(subjectName,stimParams,actualPower);
+    [correlationsFull(:,i),correlationsSelected(:,i),predictionString,~,selectedImageIndices] = getAllCorrelations(subjectName,stimParams,actualPower,rCutoff,predictionVals(i,:));
     numSelectedImages(i) = length(selectedImageIndices);
 end
 end
