@@ -17,9 +17,11 @@
 % 2. selected images for which predition is deemed non-trivial (r>rCutoff)
 % (correlationValsSelected)
 
-function [correlationValsFull, correlationValsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff)
+function [correlationValsFull,correlationValsSelected,predictionString,predictedPower,selectedImageIndices,predictedPower2] = getAllCorrelations(subjectName,allStimParams,allPower,rCutoff,predictionVals)
 
 if ~exist('rCutoff','var');         rCutoff = 0.3;                      end
+if ~exist('predictionVals','var');  predictionVals = [];                end
+
 rMax = 10; % Large radius for which the gamma vs radius function saturates
 
 numStimuli = length(allStimParams);
@@ -93,7 +95,20 @@ predictionString{5} = 'HSV';
 % Use HSVR (full model)
 predictionString{6} = 'HSVR';
 [correlationValsFull(6),correlationValsSelected(6),predictedPower] = getCorrelations(subjectName,allStimParams,allPower,selectedImageIndices); % Full model
-    
+
+% Extend if predictionVals are provided
+if ~isempty(predictionVals)
+    % Correlation of power with just the prediction values
+    predictionString{7} = 'P';
+    [correlationValsFull(7),correlationValsSelected(7)] = getCorrelations2(allPower,predictionVals,selectedImageIndices);
+
+    % Correlation after combining the predicted power from HSVR and
+    % predictionVals
+    predictionString{8} = 'HSVR+P';
+    predictedPower2 = predictedPower; % Update after doing cross-validated regression
+
+    [correlationValsFull(8),correlationValsSelected(8)] = getCorrelations2(allPower,predictedPower2,selectedImageIndices);
+end
 end
 
 function [rFull,rSelected,predictedPower] = getCorrelations(subjectName,tmpStimParams,allPower,selectedImageIndices)
@@ -103,6 +118,10 @@ predictedPower = zeros(1,numStimuli);
 for i=1:numStimuli
     predictedPower(i) = getPredictedGamma(subjectName,tmpStimParams{i});
 end
+[rFull,rSelected] = getCorrelations2(allPower,predictedPower,selectedImageIndices);
+end
+function [rFull,rSelected] = getCorrelations2(allPower,predictedPower,selectedImageIndices)
+
 tmp = corrcoef(allPower,predictedPower);
 rFull = tmp(1,2);
 if length(selectedImageIndices)>2 % Need to have at least 3 data points. Otherwise correlations are trivially 1 or -1.

@@ -200,7 +200,7 @@ hReferenceChannel = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Style','popup','String',referenceChannelStringList,'FontSize',fontSizeSmall);
 
 % Prediction
-predictionStringList = [{'None'} {'mismatchL2'} {'Compressibility'}];
+predictionTypeList = [{'None'} {'mismatchL2'} {'Compressibility'}];
 
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'Position',[0 1-7*(parameterBoxHeight+parameterBoxGap) parameterTextWidth parameterBoxHeight], ...
@@ -208,7 +208,7 @@ uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
 hPredictionType = uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
     'BackgroundColor', backgroundColor, 'Position',...
     [parameterTextWidth 1-7*(parameterBoxHeight+parameterBoxGap) 1-parameterTextWidth parameterBoxHeight], ...
-    'Style','popup','String',predictionStringList,'FontSize',fontSizeSmall);
+    'Style','popup','String',predictionTypeList,'FontSize',fontSizeSmall);
 
 % Option to change radius
 uicontrol('Parent',hParameterPanel,'Unit','Normalized', ...
@@ -385,8 +385,7 @@ elseif powerOption==3
     powerST = powerST - powerST2; % Difference in the ratios
 end
 
-hPowerPredictionPlot = subplot('Position',[0.825 0.525 0.15 0.175]);
-hPowerPredictionPlot2 = subplot('Position',[0.825 0.325 0.15 0.175]);
+hPowerPredictionPlots = getPlotHandles(3,1,[0.825 0.3 0.15 0.4],0,0.02);
 hCorrelationPlotFull = subplot('Position',[0.825 0.16 0.15 0.1]);
 hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.1]);
 
@@ -402,6 +401,9 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.1]);
 
         fValsToUse = fValsUnique(numPlots*(setNum-1) + (1:numPlots));
         
+        predictionType = predictionTypeList{get(hPredictionType,'val')};
+        radiusMatrixDeg = str2num(get(hRadius,'String')); %#ok<*ST2NM>
+
         %%%%%%%%%%%%%%%%%%%%%%%% Plot Neural Data %%%%%%%%%%%%%%%%%%%%%%%%%
         if analysisType == 2 || analysisType == 3 % Spike Data
             channelPos = get(hSpikeChannel,'val');
@@ -446,26 +448,41 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.1]);
         end
         
         %%%%%%%%%%% Plot the images and their predictions %%%%%%%%%%%%%%%%%
-        allStimParams = plotImageData(hImagesPlot,hImagePatchesPlot,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor,selectOptions,radiusMatrixDeg);
+        [allStimParams,allPatchData,imageAxesDeg] = plotImageData(hImagesPlot,hImagePatchesPlot,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,plotColor,selectOptions,radiusMatrixDeg);
         allPower = squeeze(powerST(:,electrodeListPower==channelNumber,fValsToUse)); % Actual power
-        [correlationsFull, correlationsSelected, predictionString, predictedPower, selectedImageIndices] = getAllCorrelations(subjectName,allStimParams,allPower);
+        predictionVals = getPredictionValues(allStimParams,allPatchData,imageAxesDeg,predictionType);
+
+        [correlationsFull,correlationsSelected,predictionString,predictedPower,selectedImageIndices,predictedPower2] = getAllCorrelations(subjectName,allStimParams,allPower,0.3,predictionVals);
         
         numStimuli = length(allStimParams);
         colorNamesPower = jet(numStimuli);
-        cla(hPowerPredictionPlot);
-        hold(hPowerPredictionPlot,'on');
-        for i=1:numStimuli
-            title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
-            if isempty(intersect(i,selectedImageIndices)) % Not a selected image
-                plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:));
-            else
-                plot(hPowerPredictionPlot,allPower(i),predictedPower(i),'marker','o','color',colorNamesPower(i,:),'markerfacecolor',colorNamesPower(i,:));
+
+        for p=1:length(hPowerPredictionPlots)
+            hPowerPredictionPlot = hPowerPredictionPlots(p);
+            if p==1
+                displayData = predictedPower; displayStr = 'Predicted Gamma (HSVR)';
+            elseif p==2
+                displayData = predictionVals; displayStr = 'PredictionVals';
+            elseif p==3
+                displayData = predictedPower2; displayStr = 'Predicted Gamma (HSVR+P)';
             end
-            text(allPower(i),predictedPower(i)+0.001,num2str(i),'parent',hPowerPredictionPlot);
+
+            cla(hPowerPredictionPlot);
+            hold(hPowerPredictionPlot,'on');
+            for i=1:numStimuli
+                title(hImagesPlot(i),num2str(i),'color',colorNamesPower(i,:));
+                if isempty(intersect(i,selectedImageIndices)) % Not a selected image
+                    plot(hPowerPredictionPlot,allPower(i),displayData(i),'marker','o','color',colorNamesPower(i,:));
+                else
+                    plot(hPowerPredictionPlot,allPower(i),displayData(i),'marker','o','color',colorNamesPower(i,:),'markerfacecolor',colorNamesPower(i,:));
+                end
+                text(allPower(i),displayData(i)+0.001,num2str(i),'parent',hPowerPredictionPlot);
+            end
+            title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(5+p),2)) ', rSel(N=' num2str(length(selectedImageIndices)) '):' num2str(round(correlationsSelected(5+p),2))]);
+            ylabel(hPowerPredictionPlot,displayStr);
         end
-        title(hPowerPredictionPlot,['rFull: ' num2str(round(correlationsFull(6),2)) ', rSel(N=' num2str(length(selectedImageIndices)) '):' num2str(round(correlationsSelected(6),2))]);
-        xlabel(hPowerPredictionPlot,'Actual Gamma'); ylabel(hPowerPredictionPlot,'Predicted Gamma'); 
-        
+        xlabel(hPowerPredictionPlots(end),'Actual Gamma'); 
+
         bar(correlationsFull,'Parent',hCorrelationPlotFull);
         set(hCorrelationPlotFull,'XTickLabel',[]);
         title(hCorrelationPlotFull,'Full set');
@@ -556,7 +573,7 @@ hCorrelationPlotSelected = subplot('Position',[0.825 0.05 0.15 0.1]);
         claGivenPlotHandle(hImagePatchPredictionPlot);
         claGivenPlotHandle(hDataPlot);
    
-        cla(hPowerPredictionPlot);
+        claGivenPlotHandle(hPowerPredictionPlots);
         cla(hCorrelationPlotFull);
         cla(hCorrelationPlotSelected);
         
@@ -936,7 +953,7 @@ end
 end
 %%%%%%%%%%%%c%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Display Images
-function allStimParams = plotImageData(hImagesPlot,hImagePatches,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName,selectOptions,radiusMatrixDeg)
+function [allStimParams,allPatchData,imageAxesDeg] = plotImageData(hImagesPlot,hImagePatches,hImagePatchPredictionPlot,rawImageFolder,fValsToUse,channelNumber,subjectName,colorName,selectOptions,radiusMatrixDeg)
 patchSizeDeg=2;
 if isempty(radiusMatrixDeg)
     radiusMatrixDeg = 0.3:0.3:patchSizeDeg;
@@ -956,6 +973,8 @@ gaborStim.sigmaDeg=100000; % The program makeGaborStimulus actually produces Gab
 
 numImages = length(fValsToUse);
 allStimParams = cell(1,numImages);
+allPatchData = cell(1,numImages);
+
 for i=1:numImages
     imageFileName = fullfile(rawImageFolder,['Image' num2str(fValsToUse(i)) '.png']);
     plottingDetails.hImagePlot=hImagesPlot(i);
@@ -966,6 +985,7 @@ for i=1:numImages
     stimParams = getSingleImageParameters(rgb2hsv(patchData{1}),imageAxesDeg,[0 0],radiusMatrixDeg,selectOptions,0);
 
     allStimParams{i} = stimParams;
+    allPatchData{i} = patchData{1};
     
     tmpGaborStim = gaborStim;
     tmpGaborStim.hueDeg = stimParams.hueDeg;
